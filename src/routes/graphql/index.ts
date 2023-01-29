@@ -113,7 +113,7 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
             type: ProfileType,
             args: {},
             async resolve(parent) {
-              return await fastify.db.posts.findOne({
+              return await fastify.db.profiles.findOne({
                 key: 'userId',
                 equals: parent.id,
               });
@@ -134,6 +134,19 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
                 key: 'id',
                 equals: profile.memberTypeId,
               });
+            },
+          },
+          subscribedToUser: { type: new GraphQLList(GraphQLString) },
+
+          userSubscribedTo: {
+            type: new GraphQLList(GraphQLString),
+            args: {},
+            async resolve(parent) {
+              const users = await fastify.db.users.findMany({
+                key: 'subscribedToUserIds',
+                inArray: parent.id,
+              });
+              return users.map((user) => user.id);
             },
           },
         }),
