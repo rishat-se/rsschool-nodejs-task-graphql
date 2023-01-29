@@ -91,7 +91,7 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
       });
 
       const UserType = new GraphQLObjectType({
-        name: 'User',
+        name: 'UserType',
         fields: () => ({
           id: { type: GraphQLString },
           firstName: { type: GraphQLString },
@@ -102,6 +102,7 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
             type: new GraphQLList(PostType),
             args: {},
             async resolve(parent) {
+              console.log(parent);
               return await fastify.db.posts.findMany({
                 key: 'userId',
                 equals: parent.id,
@@ -167,6 +168,44 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
           city: { type: new GraphQLNonNull(GraphQLString) },
           memberTypeId: { type: new GraphQLNonNull(GraphQLString) },
           userId: { type: new GraphQLNonNull(GraphQLString) },
+        },
+      });
+
+      const UserUpdateType = new GraphQLInputObjectType({
+        name: 'UserUpdateType',
+        fields: {
+          firstName: { type: GraphQLString },
+          lastName: { type: GraphQLString },
+          email: { type: GraphQLString },
+        },
+      });
+
+      const ProfileUpdateType = new GraphQLInputObjectType({
+        name: 'ProfileUpdateType',
+        fields: {
+          avatar: { type: GraphQLString },
+          sex: { type: GraphQLString },
+          birthday: { type: GraphQLString },
+          country: { type: GraphQLString },
+          street: { type: GraphQLString },
+          city: { type: GraphQLString },
+          memberTypeId: { type: GraphQLString },
+        },
+      });
+
+      const PostUpdateType = new GraphQLInputObjectType({
+        name: 'PostUpdateType',
+        fields: {
+          title: { type: GraphQLString },
+          content: { type: GraphQLString },
+        },
+      });
+
+      const MemberTypeUpdateType = new GraphQLInputObjectType({
+        name: 'MemberTypeUpdateType',
+        fields: {
+          discount: { type: GraphQLInt },
+          monthPostsLimit: { type: GraphQLInt },
         },
       });
 
@@ -264,6 +303,7 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
               return user;
             },
           },
+
           addPost: {
             type: PostType,
             args: {
@@ -279,6 +319,7 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
               return await fastify.db.posts.create(args.data);
             },
           },
+
           addProfile: {
             type: ProfileType,
             args: {
@@ -308,6 +349,91 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
                 throw fastify.httpErrors.badRequest('profile already exists');
               const newProfile = await fastify.db.profiles.create(args.data);
               return newProfile;
+            },
+          },
+
+          updateUser: {
+            type: UserType,
+            args: {
+              id: { type: GraphQLString },
+              data: { type: new GraphQLNonNull(UserUpdateType) },
+            },
+            async resolve(parent, args, options) {
+              // validate existanse of at least one field to update
+              // if (
+              //   !args.data.firstName &&
+              //   !args.data.lastName &&
+              //   !args.data.email
+              // )
+              //   throw fastify.httpErrors.badRequest('no fields  to update');
+              try {
+                return await fastify.db.users.change(args.id, args.data);
+              } catch {
+                throw fastify.httpErrors.badRequest(
+                  'user not found or wrong id'
+                );
+              }
+            },
+          },
+
+          updateProfile: {
+            type: ProfileType,
+            args: {
+              id: { type: GraphQLString },
+              data: { type: new GraphQLNonNull(ProfileUpdateType) },
+            },
+            async resolve(parent, args, options) {
+              //check if memberTypeId is present and is correct
+              if (args.data.memberTypeId !== undefined) {
+                const memberType = await fastify.db.memberTypes.findOne({
+                  key: 'id',
+                  equals: args.data.memberTypeId,
+                });
+                if (!memberType)
+                  throw fastify.httpErrors.badRequest(
+                    'member type is incorrect'
+                  );
+              }
+              // if have time validate existanse of at least one field to update
+              try {
+                return await fastify.db.profiles.change(args.id, args.data);
+              } catch {
+                throw fastify.httpErrors.badRequest(
+                  'profile not found or wrong id'
+                );
+              }
+            },
+          },
+
+          updatePost: {
+            type: PostType,
+            args: {
+              id: { type: GraphQLString },
+              data: { type: new GraphQLNonNull(PostUpdateType) },
+            },
+            async resolve(parent, args, options) {
+              try {
+                return await fastify.db.posts.change(args.id, args.data);
+              } catch {
+                throw fastify.httpErrors.badRequest(
+                  'post not found or wrong id'
+                );
+              }
+            },
+          },
+
+          updateMemberType: {
+            type: MemberTypeType,
+            args: {
+              id: { type: GraphQLString },
+              data: { type: new GraphQLNonNull(MemberTypeUpdateType) },
+            },
+            async resolve(parent, args, options) {
+              try {
+                return await fastify.db.memberTypes.change(args.id, args.data);
+              } catch {
+                throw fastify.httpErrors.badRequest('member type not found');
+              }
             },
           },
         },
