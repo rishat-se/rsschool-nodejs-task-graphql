@@ -1,7 +1,13 @@
 import { FastifyPluginAsyncJsonSchemaToTs } from '@fastify/type-provider-json-schema-to-ts';
 //import { graphql, buildSchema } from 'graphql';
 import { graphql, GraphQLObjectType, GraphQLString } from 'graphql';
-import { GraphQLInt, GraphQLList, GraphQLSchema } from 'graphql/type';
+import {
+  GraphQLInputObjectType,
+  GraphQLInt,
+  GraphQLList,
+  GraphQLNonNull,
+  GraphQLSchema,
+} from 'graphql/type';
 import { graphqlBodySchema } from './schema';
 //import { UserEntity } from '../../utils/DB/entities/DBUsers';
 
@@ -132,6 +138,38 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
         }),
       });
 
+      const UserInputType = new GraphQLInputObjectType({
+        name: 'UserInputType',
+        fields: {
+          firstName: { type: new GraphQLNonNull(GraphQLString) },
+          lastName: { type: new GraphQLNonNull(GraphQLString) },
+          email: { type: new GraphQLNonNull(GraphQLString) },
+        },
+      });
+
+      const PostInputType = new GraphQLInputObjectType({
+        name: 'PostInputType',
+        fields: {
+          title: { type: new GraphQLNonNull(GraphQLString) },
+          content: { type: new GraphQLNonNull(GraphQLString) },
+          userId: { type: new GraphQLNonNull(GraphQLString) },
+        },
+      });
+
+      const ProfileInputType = new GraphQLInputObjectType({
+        name: 'ProfileInputType',
+        fields: {
+          avatar: { type: new GraphQLNonNull(GraphQLString) },
+          sex: { type: new GraphQLNonNull(GraphQLString) },
+          birthday: { type: new GraphQLNonNull(GraphQLInt) },
+          country: { type: new GraphQLNonNull(GraphQLString) },
+          street: { type: new GraphQLNonNull(GraphQLString) },
+          city: { type: new GraphQLNonNull(GraphQLString) },
+          memberTypeId: { type: new GraphQLNonNull(GraphQLString) },
+          userId: { type: new GraphQLNonNull(GraphQLString) },
+        },
+      });
+
       const QueryRootType = new GraphQLObjectType({
         name: 'QueryRootType',
         fields: {
@@ -213,9 +251,71 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
         },
       });
 
+      const RootMutation = new GraphQLObjectType({
+        name: 'RootMutationType',
+        fields: {
+          addUser: {
+            type: UserType,
+            args: {
+              data: { type: new GraphQLNonNull(UserInputType) },
+            },
+            async resolve(parent, args, options) {
+              const user = await fastify.db.users.create(args.data);
+              return user;
+            },
+          },
+          addPost: {
+            type: PostType,
+            args: {
+              data: { type: new GraphQLNonNull(PostInputType) },
+            },
+            async resolve(parent, args, options) {
+              const user = await fastify.db.users.findOne({
+                key: 'id',
+                equals: args.data.userId,
+              });
+              if (!user)
+                throw fastify.httpErrors.badRequest('user doesnt exist');
+              return await fastify.db.posts.create(args.data);
+            },
+          },
+          addProfile: {
+            type: ProfileType,
+            args: {
+              data: { type: new GraphQLNonNull(ProfileInputType) },
+            },
+            async resolve(parent, args, options) {
+              //check if member type exists
+              const memberType = await fastify.db.memberTypes.findOne({
+                key: 'id',
+                equals: args.data.memberTypeId,
+              });
+              if (!memberType)
+                throw fastify.httpErrors.badRequest('member type is incorrect');
+              // check if user exists
+              const user = await fastify.db.users.findOne({
+                key: 'id',
+                equals: args.data.userId,
+              });
+              if (!user)
+                throw fastify.httpErrors.badRequest('user id is incorrect');
+              // check if profile already exists
+              const profile = await fastify.db.profiles.findOne({
+                key: 'userId',
+                equals: args.data.userId,
+              });
+              if (profile)
+                throw fastify.httpErrors.badRequest('profile already exists');
+              const newProfile = await fastify.db.profiles.create(args.data);
+              return newProfile;
+            },
+          },
+        },
+      });
+
       const Schema = new GraphQLSchema({
         query: QueryRootType,
-        //        mutation: MyAppMutationRootType
+        mutation: RootMutation,
       });
 
       //   type Query {
