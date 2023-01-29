@@ -209,6 +209,20 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
         },
       });
 
+      const SubscribeToType = new GraphQLInputObjectType({
+        name: 'SubscribeToType',
+        fields: {
+          id: { type: GraphQLString },
+        },
+      });
+
+      const UnsubscribeFromType = new GraphQLInputObjectType({
+        name: 'UnsubscribeFromType',
+        fields: {
+          id: { type: GraphQLString },
+        },
+      });
+
       const QueryRootType = new GraphQLObjectType({
         name: 'QueryRootType',
         fields: {
@@ -373,6 +387,65 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
                   'user not found or wrong id'
                 );
               }
+            },
+          },
+
+          subscribeTo: {
+            type: UserType,
+            args: {
+              id: { type: GraphQLString },
+              data: { type: new GraphQLNonNull(SubscribeToType) },
+            },
+            async resolve(parent, args, options) {
+              // check if user exists
+              const user = await fastify.db.users.findOne({
+                key: 'id',
+                equals: args.id,
+              });
+              if (!user) throw fastify.httpErrors.notFound('user not found');
+              // check if subscriber already exists
+              const idx = user.subscribedToUserIds.findIndex(
+                (item) => item === args.data.id
+              );
+              if (idx !== -1)
+                throw fastify.httpErrors.badRequest(
+                  'user is already subscribed'
+                );
+              // add subscriber
+              user.subscribedToUserIds.push(args.data.id);
+              const changedUser = await fastify.db.users.change(args.id, {
+                subscribedToUserIds: user.subscribedToUserIds,
+              });
+              return changedUser;
+            },
+          },
+
+          unsubscribeFrom: {
+            type: UserType,
+            args: {
+              id: { type: GraphQLString },
+              data: { type: new GraphQLNonNull(UnsubscribeFromType) },
+            },
+            async resolve(parent, args, options) {
+              //check if user exist
+              const user = await fastify.db.users.findOne({
+                key: 'id',
+                equals: args.id,
+              });
+              if (!user) throw fastify.httpErrors.notFound('user not found');
+
+              //check if subscriber exists
+              const idx = user.subscribedToUserIds.findIndex(
+                (item) => item === args.data.id
+              );
+              if (idx === -1)
+                throw fastify.httpErrors.badRequest('user is not subscribed');
+
+              user.subscribedToUserIds.splice(idx, 1);
+              const changedUser = await fastify.db.users.change(args.id, {
+                subscribedToUserIds: user.subscribedToUserIds,
+              });
+              return changedUser;
             },
           },
 
