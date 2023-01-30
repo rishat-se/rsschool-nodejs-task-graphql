@@ -23,6 +23,7 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
       },
     },
     async function (request, reply) {
+      //dataloaders
       const userLoader = new DataLoader(async (keys) => {
         const users = await fastify.db.users.findMany({
           key: 'id',
@@ -315,7 +316,6 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
             type: UserType,
             args: { id: { type: GraphQLString } },
             async resolve(parent, args) {
-              // return await userLoader.load(args.id);
               return await fastify.db.users.findOne({
                 key: 'id',
                 equals: args.id,
@@ -394,13 +394,6 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
               data: { type: new GraphQLNonNull(UserUpdateType) },
             },
             async resolve(parent, args, options) {
-              // validate existanse of at least one field to update
-              // if (
-              //   !args.data.firstName &&
-              //   !args.data.lastName &&
-              //   !args.data.email
-              // )
-              //   throw fastify.httpErrors.badRequest('no fields  to update');
               try {
                 return await fastify.db.users.change(args.id, args.data);
               } catch {
@@ -488,7 +481,6 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
                     'member type is incorrect'
                   );
               }
-              // if have time validate existanse of at least one field to update
               try {
                 return await fastify.db.profiles.change(args.id, args.data);
               } catch {
@@ -538,40 +530,11 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
         mutation: RootMutation,
       });
 
-      //   type Query {
-      //     getUsers: [UserEntity]
-      //     getProfiles: [ProfileEntity]
-      //     getPosts: [PostEntity]
-      //     getMemberTypes: [MemberTypeEntity]
-      //     getUser(id: String): UserEntity
-      //   }
-      // `);
-
-      // var root = {
-      //   getMemberTypes: async () => {
-      //     return await fastify.db.memberTypes.findMany();
-      //   },
-      //   getPosts: async () => {
-      //     return await fastify.db.posts.findMany();
-      //   },
-      //   getProfiles: async () => {
-      //     return await fastify.db.profiles.findMany();
-      //   },
-      //   getUsers: async () => {
-      //     return await fastify.db.users.findMany();
-      //   },
-      //   getUser: async ({ id }: { id: string }) => {
-      //     console.log(id);
-      //     return await fastify.db.users.findOne({ key: 'id', equals: id });
-      //   },
-      // };
-
       if (request.body.query) {
         return await graphql({
           schema: Schema,
           source: request.body.query,
           variableValues: request.body.variables,
-          //          rootValue: root,
         });
       }
     }
