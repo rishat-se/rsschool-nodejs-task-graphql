@@ -23,47 +23,13 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
       },
     },
     async function (request, reply) {
-      // const schema = buildSchema(`
-      //   type MemberTypeEntity {
-      //     id: String!
-      //     discount: Int!
-      //     monthPostsLimit: Int!
-      //   }
-
-      //   type PostEntity {
-      //     id: String!
-      //     title: String!
-      //     content: String!
-      //     userId: String!
-      //   }
-
-      //   type ProfileEntity {
-      //     id: String!
-      //     avatar: String!
-      //     sex: String!
-      //     birthday: Int!
-      //     country: String!
-      //     street: String!
-      //     city: String!
-      //     memberTypeId: String!
-      //     userId: String!
-      //   }
-
-      //   type UserEntity {
-      //     id: String!
-      //     firstName: String!
-      //     lastName: String!
-      //     email: String!
-      //     subscribedToUserIds: [String]!
-      //   }
-
-      // const userLoader = new DataLoader(async (keys) => {
-      //   const user = await fastify.db.users.findMany({
-      //     key: 'id',
-      //     equalsAnyOf: keys as string[],
-      //   });
-      //   return Promise.resolve(user.length ? user : [undefined]);
-      // });
+      const userLoader = new DataLoader(async (keys) => {
+        const users = await fastify.db.users.findMany({
+          key: 'id',
+          equalsAnyOf: keys as string[],
+        });
+        return keys.map((key) => users.find((user) => user.id === key));
+      });
 
       const membertypeLoader = new DataLoader(async (keys) => {
         const memberTypes = await fastify.db.memberTypes.findMany({
@@ -168,17 +134,6 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
             },
           },
 
-          subscribedToUser: {
-            type: new GraphQLList(UserType),
-            args: {},
-            async resolve(parent) {
-              return await fastify.db.users.findMany({
-                key: 'id',
-                equalsAnyOf: parent.subscribedToUserIds,
-              });
-            },
-          },
-
           userSubscribedTo: {
             type: new GraphQLList(UserType),
             args: {},
@@ -187,6 +142,18 @@ const plugin: FastifyPluginAsyncJsonSchemaToTs = async (
                 key: 'subscribedToUserIds',
                 inArray: parent.id,
               });
+            },
+          },
+
+          subscribedToUser: {
+            type: new GraphQLList(UserType),
+            args: {},
+            async resolve(parent) {
+              return await userLoader.loadMany(parent.subscribedToUserIds);
+              // return await fastify.db.users.findMany({
+              //   key: 'id',
+              //   equalsAnyOf: parent.subscribedToUserIds,
+              // });
             },
           },
         }),
